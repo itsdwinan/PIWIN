@@ -185,14 +185,16 @@ export async function joinVoiceChannel(client, interaction) {
     }
 
     if (!player) {
-        player = client.riffy.createConnection({
-            guildId,
-            voiceChannel: channel.id,
-            textChannel: interaction.channel.id,
-            deaf: true,
-        });
-        guildData.playerChannelId = interaction.channel.id;
-    }
+    player = client.riffy.createConnection({
+        guildId,
+        voiceChannel: channel.id,
+        textChannel: interaction.channel.id,
+        deaf: true,
+    });
+
+    guildData.playerChannelId = interaction.channel.id;
+    guildData.voiceChannelId = channel.id;
+}
 
     player.setVolume(guildData.volume);
 
