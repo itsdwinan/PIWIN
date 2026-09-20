@@ -1,3 +1,4 @@
+import { getGuildConfig, updateGuildConfig } from '../../services/config/guildConfig.js';
 import { once } from 'node:events';
 import { MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { successEmbed } from '../../utils/embeds.js';
@@ -133,15 +134,20 @@ export async function ensurePlayer(client, interaction) {
     const guildData = getGuildMusicData(guildId);
     let player = getPlayer(client, guildId);
 
-    if (!player) {
-        player = client.riffy.createConnection({
-            guildId,
-            voiceChannel: interaction.member.voice.channel.id,
-            textChannel: interaction.channel.id,
-            deaf: true,
-        });
-        guildData.playerChannelId = interaction.channel.id;
-    }
+    const voiceChannelId = interaction.member.voice.channel.id;
+
+if (!player) {
+    player = client.riffy.createConnection({
+        guildId,
+        voiceChannel: voiceChannelId,
+        textChannel: interaction.channel.id,
+        deaf: true,
+    });
+
+    guildData.playerChannelId = interaction.channel.id;
+}
+
+guildData.voiceChannelId = player.voiceChannel || voiceChannelId;
 
     player.setVolume(guildData.volume);
     return { player, guildData };
@@ -510,12 +516,33 @@ export async function clearQueue(client, interaction) {
 }
 
 export async function setTwentyFourSeven(client, interaction, enabled) {
-    const guildData = getGuildMusicData(interaction.guild.id);
+    const guildId = interaction.guild.id;
+    const guildData = getGuildMusicData(guildId);
+    const player = getPlayer(client, guildId);
+
+    if (enabled && !player?.voiceChannel) {
+        throw new TitanBotError(
+            'No voice connection',
+            ErrorTypes.USER_INPUT,
+            'The bot must already be in a voice channel before enabling 24/7 mode.'
+        );
+    }
+
     guildData.twentyFourSeven = enabled;
+    guildData.voiceChannelId = enabled ? player.voiceChannel : null;
+
+    await updateGuildConfig(client, guildId, {
+        music: {
+            twentyFourSeven: enabled,
+            voiceChannelId: enabled ? player.voiceChannel : null,
+            textChannelId: enabled ? guildData.playerChannelId : null,
+        },
+    });
+
     return successEmbed(
         '24/7 Mode',
         enabled
-            ? '24/7 mode enabled. The bot will stay in the voice channel when the queue ends.'
+            ? '24/7 mode enabled. The bot will stay in the voice channel and rejoin it after a restart.'
             : '24/7 mode disabled. The bot will leave after 30 seconds of idle time.',
     );
 }
@@ -609,4 +636,54 @@ export async function replyMusicSuccess(interaction, embed) {
         options.flags = MessageFlags.Ephemeral;
     }
     await InteractionHelper.safeReply(interaction, options);
+}
+
+export async function restoreTwentyFourSevenPlayers(client) {
+    for (const guild of client.guilds.cache.values()) {
+        try {
+            const savedConfig = await getGuildConfig(client, guild.id);
+            const music = savedConfig?.music;
+
+            if (!music?.twentyFourSeven || !music.voiceChannelId) {
+                continue;
+            }
+
+            const voiceChannel = guild.channels.cache.get(music.voiceChannelId);
+
+            if (!voiceChannel) {
+                logger.warn(
+                    `[24/7] Voice channel ${music.voiceChannelId} not found in guild ${guild.id}.`
+                );
+                continue;
+            }
+
+            if (client.riffy.players.get(guild.id)) {
+                continue;
+            }
+
+            const guildData = getGuildMusicData(guild.id);
+
+            guildData.twentyFourSeven = true;
+            guildData.voiceChannelId = music.voiceChannelId;
+            guildData.playerChannelId = music.textChannelId || null;
+
+            const player = client.riffy.createConnection({
+                guildId: guild.id,
+                voiceChannel: music.voiceChannelId,
+                textChannel: music.textChannelId || music.voiceChannelId,
+                deaf: true,
+            });
+
+            player.setVolume(guildData.volume);
+
+            logger.info(
+                `[24/7] Rejoined "${guild.name}" -> ${voiceChannel.name}`
+            );
+        } catch (error) {
+            logger.error(
+                `[24/7] Failed to rejoin guild ${guild.id}:`,
+                error
+            );
+        }
+    }
 }
