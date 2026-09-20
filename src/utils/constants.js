@@ -30,6 +30,11 @@ export const DEFAULT_GUILD_CONFIG = {
     adminRole: null,
     welcomeChannel: null,
     autoRole: null,
+    music: { 
+            twentyFourSeven: false,
+            voiceChannelId: null,
+            textChannelId: null,
+    },
     logging: {
         enabled: false,
         channels: { audit: null, applications: null, reports: null },
