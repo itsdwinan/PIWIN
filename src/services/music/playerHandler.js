@@ -1,6 +1,7 @@
 // Player event handlers for Riffy. Adapted from Musicify playerHandler (Apache-2.0).
 
 import { logger } from '../../utils/logger.js';
+import { getGuildConfig } from '../../services/config/guildConfig.js';
 import { getGuildMusicData, clearUpdateInterval } from './playerStore.js';
 import {
     buildNowPlayingEmbed,
@@ -249,6 +250,56 @@ export async function shutdownMusic(client) {
             player.destroy();
         } catch (error) {
             logger.debug('Error destroying music player during shutdown:', error.message);
+        }
+    }
+}
+
+export async function restoreTwentyFourSevenPlayers(client) {
+    for (const guild of client.guilds.cache.values()) {
+        try {
+            const savedConfig = await getGuildConfig(client, guild.id);
+            const music = savedConfig?.music;
+
+            if (!music?.twentyFourSeven || !music.voiceChannelId) {
+                continue;
+            }
+
+            const voiceChannel = guild.channels.cache.get(music.voiceChannelId);
+
+            if (!voiceChannel) {
+                logger.warn(
+                    `[24/7] Voice channel ${music.voiceChannelId} not found in guild ${guild.id}.`
+                );
+                continue;
+            }
+
+            if (client.riffy.players.get(guild.id)) {
+                continue;
+            }
+
+            const guildData = getGuildMusicData(guild.id);
+
+            guildData.twentyFourSeven = true;
+            guildData.voiceChannelId = music.voiceChannelId;
+            guildData.playerChannelId = music.textChannelId || null;
+
+            const player = client.riffy.createConnection({
+                guildId: guild.id,
+                voiceChannel: music.voiceChannelId,
+                textChannel: music.textChannelId || music.voiceChannelId,
+                deaf: true,
+            });
+
+            player.setVolume(guildData.volume);
+
+            logger.info(
+                `[24/7] Rejoined "${guild.name}" -> ${voiceChannel.name}`
+            );
+        } catch (error) {
+            logger.error(
+                `[24/7] Failed to rejoin guild ${guild.id}:`,
+                error
+            );
         }
     }
 }
