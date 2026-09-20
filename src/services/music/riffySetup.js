@@ -61,9 +61,13 @@ export function initializeMusic(client) {
     logger.info(`Music initialized with ${lavalinkConfig.nodes.length} Lavalink node(s).`);
 }
 
-export function initRiffyAfterReady(client) {
-    if (client.riffy && client.user?.id) {
-        client.riffy.init(client.user.id);
-        logger.info('Riffy voice connection manager initialized.');
+export async function initRiffyAfterReady(client) {
+    if (!client.riffy || !client.user?.id) {
+        return;
     }
+
+    client.riffy.init(client.user.id);
+    logger.info('Riffy voice connection manager initialized.');
+
+    await restoreTwentyFourSevenPlayers(client);
 }
