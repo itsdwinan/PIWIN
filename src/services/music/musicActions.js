@@ -1,4 +1,5 @@
 import { getGuildConfig, updateGuildConfig } from '../../services/config/guildConfig.js';
+import { logger } from '../../utils/logger.js';
 import { once } from 'node:events';
 import { MessageFlags, PermissionFlagsBits } from 'discord.js';
 import { successEmbed } from '../../utils/embeds.js';
