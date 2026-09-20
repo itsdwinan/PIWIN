@@ -1,5 +1,6 @@
 // Player event handlers for Riffy. Adapted from Musicify playerHandler (Apache-2.0).
 
+import { getGuildConfig, updateGuildConfig } from '../../services/config/guildConfig.js';
 import { logger } from '../../utils/logger.js';
 import { getGuildMusicData, clearUpdateInterval } from './playerStore.js';
 import {
