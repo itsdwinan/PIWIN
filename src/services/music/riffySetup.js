@@ -66,8 +66,41 @@ export async function initRiffyAfterReady(client) {
         return;
     }
 
+    let restored = false;
+
+    const restoreWhenNodeReady = async () => {
+        if (restored) {
+            return;
+        }
+
+        const nodes = [
+            ...(client.riffy.nodeMap?.values() || [])
+        ];
+
+        const hasConnectedNode = nodes.some((node) => node.connected);
+
+        if (!hasConnectedNode) {
+            logger.info('[24/7] Waiting for a connected Lavalink node...');
+            return;
+        }
+
+        restored = true;
+
+        client.riffy.off('nodeConnect', restoreWhenNodeReady);
+
+        try {
+            await restoreTwentyFourSevenPlayers(client);
+        } catch (error) {
+            logger.error('[24/7] Failed to restore players:', error);
+        }
+    };
+
+    client.riffy.on('nodeConnect', restoreWhenNodeReady);
+
     client.riffy.init(client.user.id);
+
     logger.info('Riffy voice connection manager initialized.');
 
-    await restoreTwentyFourSevenPlayers(client);
+    // Coba langsung kalau node ternyata sudah connect.
+    await restoreWhenNodeReady();
 }
