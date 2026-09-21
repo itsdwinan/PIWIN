@@ -330,7 +330,7 @@ class TitanBot extends Client {
     }
   }
 
-  async shutdown(reason = 'UNKNOWN') {
+  async shutdown(reason = 'UNKNOWN', exitCode = 0) {
     shutdownLog(`Bot is shutting down (${reason})...`);
     logger.info(`\n${'='.repeat(60)}`);
     logger.info(`🛑 Graceful Shutdown Initiated (${reason})`);
@@ -382,7 +382,7 @@ class TitanBot extends Client {
       process.exit(0);
     } catch (error) {
       logger.error('Error during graceful shutdown:', error);
-      process.exit(1);
+      process.exit(exitCode);
     }
   }
 }
@@ -395,9 +395,8 @@ try {
     process.on('SIGINT', () => bot.shutdown('SIGINT'));
     
     process.on('uncaughtException', (error) => {
-      // Process state may be corrupt after an uncaught throw; log and shut down cleanly.
-      handleTaskError('uncaught_exception', error, { fatal: true });
-      bot.shutdown('UNCAUGHT_EXCEPTION');
+    handleTaskError('uncaught_exception', error, { fatal: true });
+    bot.shutdown('UNCAUGHT_EXCEPTION', 1);
     });
 
     process.on('unhandledRejection', (reason) => {
